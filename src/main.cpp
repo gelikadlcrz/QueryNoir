@@ -474,6 +474,10 @@ static void draw_center(){
         centered("Query returned 0 rows.",C_DIM(0.28f));
     } else {
         int nc=(int)s_result.columns.size();
+        // Track which cell was clicked for the popup
+        static std::string s_popup_cell;
+        static bool        s_popup_open=false;
+
         if(nc>0&&ImGui::BeginTable("##rt",nc,
             ImGuiTableFlags_Borders|ImGuiTableFlags_RowBg|
             ImGuiTableFlags_ScrollX|ImGuiTableFlags_ScrollY|
@@ -499,11 +503,69 @@ static void draw_center(){
                 }
                 for(size_t ci=0;ci<s_result.rows[ri].size();ci++){
                     ImGui::TableSetColumnIndex((int)ci);
-                    ImGui::TextColored(
-                        flag?C_RED(0.82f):C_TEXT(0.78f),
-                        "%s",s_result.rows[ri][ci].c_str());
+                    const std::string& cell=s_result.rows[ri][ci];
+
+                    // Truncate display to 20 chars, show full on click
+                    bool long_cell = cell.size() > 24;
+                    std::string display = long_cell
+                        ? cell.substr(0,22)+"..."
+                        : cell;
+
+                    // Use Selectable so we can detect clicks
+                    ImGui::PushStyleColor(ImGuiCol_Header,ImVec4(0,0,0,0));
+                    ImGui::PushStyleColor(ImGuiCol_HeaderHovered,
+                        ImVec4(0.f,0.831f,1.f,0.10f));
+                    ImGui::PushStyleColor(ImGuiCol_Text,
+                        flag?C_RED(0.82f):C_TEXT(0.78f));
+                    char sel_id[32];
+                    snprintf(sel_id,sizeof(sel_id),"##c%zu_%zu",(size_t)ri,(size_t)ci);
+                    if(ImGui::Selectable((display+sel_id).c_str(),
+                        false, ImGuiSelectableFlags_None, {130.f,0.f}))
+                    {
+                        s_popup_cell = cell;
+                        s_popup_open = true;
+                        ImGui::OpenPopup("##cell_popup");
+                    }
+                    ImGui::PopStyleColor(3);
+
+                    // Tooltip on hover for long cells
+                    if(long_cell && ImGui::IsItemHovered()){
+                        ImGui::PushStyleColor(ImGuiCol_PopupBg,
+                            ImVec4(0.010f,0.020f,0.045f,0.98f));
+                        ImGui::BeginTooltip();
+                        ImGui::PushTextWrapPos(400.f);
+                        ImGui::TextColored(C_TEXT(0.85f),"%s",cell.c_str());
+                        ImGui::PopTextWrapPos();
+                        ImGui::TextColored(C_DIM(0.35f),"[click to open full view]");
+                        ImGui::EndTooltip();
+                        ImGui::PopStyleColor();
+                    }
                 }
             }
+
+            // Cell expand popup
+            if(ImGui::BeginPopup("##cell_popup")){
+                ImGui::PushStyleColor(ImGuiCol_PopupBg,
+                    ImVec4(0.010f,0.018f,0.040f,0.99f));
+                float popup_w = std::min(g_W*0.55f, 700.f);
+                ImGui::SetNextWindowSize({popup_w, 0});
+                ImGui::TextColored(C_NEON(0.7f),"CELL CONTENTS");
+                ImGui::SameLine(popup_w-60.f);
+                ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(0,0,0,0));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImVec4(1.f,.3f,.3f,.2f));
+                ImGui::PushStyleColor(ImGuiCol_Text,C_DIM(0.5f));
+                if(ImGui::Button("✕##cpclose")) ImGui::CloseCurrentPopup();
+                ImGui::PopStyleColor(3);
+                ImGui::Separator();
+                ImGui::Spacing();
+                ImGui::PushTextWrapPos(popup_w-20.f);
+                ImGui::TextColored(C_TEXT(0.88f),"%s",s_popup_cell.c_str());
+                ImGui::PopTextWrapPos();
+                ImGui::Spacing();
+                ImGui::PopStyleColor();
+                ImGui::EndPopup();
+            }
+
             ImGui::EndTable();
         }
     }
@@ -601,7 +663,14 @@ static void draw_schema(){
 
     ImGui::TextColored(C_NEON(),"DATABASE SCHEMA");
     ImGui::SameLine();
-    ImGui::TextColored(C_DIM(0.3f),"— NovaCorp Internal Systems");
+    ImGui::TextColored(C_DIM(0.3f),"- NovaCorp Internal Systems");
+    // X close button right-aligned
+    ImGui::SameLine(sw-44.f);
+    ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(0,0,0,0));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImVec4(1.f,.3f,.3f,.2f));
+    ImGui::PushStyleColor(ImGuiCol_Text,C_DIM(0.55f));
+    if(ImGui::Button("✕##sclose")) g_state.app().show_schema=false;
+    ImGui::PopStyleColor(3);
     ImGui::Spacing(); neon_sep(0.25f); ImGui::Spacing();
 
     ImGui::BeginChild("##sc2",{-1,-1});
@@ -653,7 +722,7 @@ static void draw_accuse_modal(){
     auto& app=g_state.app();
     if(!app.accuse.active || app.status==GameStatus::CASE_SOLVED) return;
 
-    float mw=500.f, mh=260.f;
+    float mw=580.f, mh=300.f;
     ImGui::SetNextWindowPos({(g_W-mw)*.5f,(g_H-mh)*.5f});
     ImGui::SetNextWindowSize({mw,mh});
     ImGui::PushStyleColor(ImGuiCol_WindowBg,ImVec4(0.015f,0.028f,0.060f,0.99f));
@@ -664,30 +733,44 @@ static void draw_accuse_modal(){
         ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_NoMove|
         ImGuiWindowFlags_NoResize);
 
+    // Header row with X button
     ImGui::TextColored(C_RED(),"MAKE YOUR ACCUSATION");
+    ImGui::SameLine(mw-58.f);
+    ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(0,0,0,0));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImVec4(1.f,.3f,.3f,.2f));
+    ImGui::PushStyleColor(ImGuiCol_Text,C_DIM(0.55f));
+    if(ImGui::Button("✕##aclose")) app.accuse.active=false;
+    ImGui::PopStyleColor(3);
+
     ImGui::Spacing(); neon_sep(0.20f); ImGui::Spacing();
     ImGui::PushTextWrapPos(mw-52.f);
-    ImGui::TextColored(C_TEXT(0.70f),
-        "You have enough evidence to name a suspect. "
-        "Type the full name of the person you believe murdered Marcus Orion. "
-        "Choose carefully — a wrong accusation costs you.");
+    ImGui::TextColored(C_TEXT(0.68f),
+        "You have enough evidence. Type the full name of the person "
+        "you believe murdered Marcus Orion. A wrong accusation costs you.");
     ImGui::PopTextWrapPos();
     ImGui::Spacing();
 
     // Wrong feedback
     if(app.accuse.wrong_timer>0.f){
         ImGui::PushTextWrapPos(mw-52.f);
-        ImGui::TextColored(C_RED(0.80f),"✗  %s",app.accuse.wrong_feedback.c_str());
+        ImGui::TextColored(C_RED(0.78f),"X  %s",app.accuse.wrong_feedback.c_str());
         ImGui::PopTextWrapPos();
         ImGui::Spacing();
     }
 
-    ImGui::TextColored(C_DIM(0.5f),"Name:");
-    ImGui::SameLine(0,8);
-    ImGui::SetNextItemWidth(mw-120.f);
+    // Name label + input on same line
+    ImGui::TextColored(C_DIM(0.5f),"Suspect:");
+    ImGui::SameLine(0,10);
+
+    // Input takes all space except for the two buttons
+    float charge_w = 90.f;
+    float cancel_w = 80.f;
+    float gap      = 8.f;
+    float input_w  = mw - 52.f*2 - 10.f - 90.f - charge_w - cancel_w - gap*2 - 4.f;
+    ImGui::SetNextItemWidth(input_w);
 
     ImGui::PushStyleColor(ImGuiCol_FrameBg,ImVec4(0.f,0.f,0.f,.6f));
-    ImGui::PushStyleColor(ImGuiCol_Border,C_RED(0.50f));
+    ImGui::PushStyleColor(ImGuiCol_Border,C_RED(0.45f));
     ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize,1.f);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,{10.f,7.f});
 
@@ -696,12 +779,21 @@ static void draw_accuse_modal(){
         ImGuiInputTextFlags_EnterReturnsTrue);
     ImGui::PopStyleColor(2); ImGui::PopStyleVar(2);
 
-    ImGui::SameLine(0,8);
+    ImGui::SameLine(0,gap);
     UITheme::push_danger_button();
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,{12.f,7.f});
-    bool submit=(ImGui::Button("CHARGE")||enter)&&strlen(s_accuse_buf)>0;
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,{0.f,7.f});
+    bool submit=(ImGui::Button("CHARGE",{charge_w,0})||enter)&&strlen(s_accuse_buf)>0;
     ImGui::PopStyleVar();
     UITheme::pop_danger_button();
+
+    ImGui::SameLine(0,gap);
+    ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.f,0.f,0.f,.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(.3f,.3f,.3f,.2f));
+    ImGui::PushStyleColor(ImGuiCol_Text,          C_DIM(0.45f));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,{0.f,7.f});
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize,1.f);
+    if(ImGui::Button("CANCEL",{cancel_w,0})) app.accuse.active=false;
+    ImGui::PopStyleColor(3); ImGui::PopStyleVar(2);
 
     if(submit){
         bool correct=g_state.try_accuse(s_accuse_buf);
@@ -710,13 +802,6 @@ static void draw_accuse_modal(){
             s_accuse_focus=true;
         }
     }
-
-    ImGui::SameLine(0,8);
-    ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(0,0,0,.0f));
-    ImGui::PushStyleColor(ImGuiCol_Text,C_DIM(0.45f));
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,{12.f,7.f});
-    if(ImGui::Button("CANCEL")) app.accuse.active=false;
-    ImGui::PopStyleColor(2); ImGui::PopStyleVar();
 
     ImGui::End();
     ImGui::PopStyleColor(2);
@@ -741,6 +826,13 @@ static void draw_solved(){
 
     ImGui::Spacing();
     centered("CASE CLOSED",C_GREEN(p));
+    // X close
+    ImGui::SameLine(mw-50.f);
+    ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(0,0,0,0));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImVec4(0.f,.6f,.3f,.2f));
+    ImGui::PushStyleColor(ImGuiCol_Text,C_DIM(0.45f));
+    if(ImGui::Button("✕##solclose")) g_state.app().status=GameStatus::ACTIVE;
+    ImGui::PopStyleColor(3);
     ImGui::Spacing();
     centered("THE ORION MURDER — RESOLVED",C_TEXT(0.85f));
     ImGui::Spacing(); neon_sep(0.14f); ImGui::Spacing();
@@ -800,6 +892,12 @@ static void draw_help(){
         ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoResize);
 
     ImGui::TextColored(C_NEON(),"HOW TO PLAY");
+    ImGui::SameLine(mw-50.f);
+    ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(0,0,0,0));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,ImVec4(0.f,.5f,.8f,.2f));
+    ImGui::PushStyleColor(ImGuiCol_Text,C_DIM(0.55f));
+    if(ImGui::Button("✕##hclose")) g_state.app().show_help=false;
+    ImGui::PopStyleColor(3);
     ImGui::Spacing(); neon_sep(0.22f); ImGui::Spacing();
 
     ImGui::PushTextWrapPos(mw-44.f);

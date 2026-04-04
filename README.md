@@ -1,230 +1,219 @@
-# 🕵️ QUERY NOIR
+# QUERY NOIR
 ### A Cyber-Detective SQL Investigation Game
 
 ```
 ╔══════════════════════════════════════════════════════╗
-║   QUERY NOIR — FORENSICS TERMINAL v4.7              ║
-║   CASE: ORION MURDER  |  STATUS: ACTIVE             ║
+║  FORENSICS TERMINAL v4.7  |  CASE: ORION MURDER      ║
+║  STATUS: ACTIVE           |  CLEARANCE: LEVEL 4      ║
 ╚══════════════════════════════════════════════════════╝
 ```
 
-Marcus Orion is dead. You have access to NovaCorp's internal systems.
-Use SQL to dig through logs, messages, and transactions — and find the killer.
+Marcus Orion, Senior Data Architect at NovaCorp, was found dead in Server Room B-7 at 02:14. You have access to the company's internal database. Five colleagues were in the building that night. The data doesn't lie — people do.
+
+Write SQL queries to uncover the truth.
 
 ---
 
-## 📦 Requirements
+## Requirements
 
-| Tool | Version |
-|------|---------|
+| Dependency | Version |
+|---|---|
 | C++ Compiler | GCC 13+ or Clang 16+ |
 | CMake | 3.16+ |
 | SDL2 | 2.0.18+ |
-| SDL2_ttf | 2.0+ |
-| SDL2_mixer | 2.0+ |
 | SQLite3 | 3.x |
 | Git | any |
-| curl + unzip | for setup script |
+| curl + unzip | used by setup script |
+
+SDL2_ttf and SDL2_mixer are listed as dependencies in CMake but audio is synthesized procedurally — no SDL2_mixer is strictly required at runtime. If it fails to find SDL2_mixer, remove it from `CMakeLists.txt` link targets.
 
 ---
 
-## 🚀 Quick Start (Linux / macOS)
+## Quick Start
 
 ```bash
-# 1. Clone or extract the project
 cd query_noir
-
-# 2. Run the setup script (installs deps, downloads ImGui + fonts)
 chmod +x setup.sh build.sh run.sh
+
+# Install dependencies, download Dear ImGui and JetBrains Mono font
 ./setup.sh
 
-# 3. Build
+# Compile
 ./build.sh
 
-# 4. Play
+# Play
 ./run.sh
+```
+
+The setup script handles everything: system package installation, cloning Dear ImGui from GitHub, downloading the JetBrains Mono font, and falling back to a SQLite3 amalgamation if the system library is not found.
+
+---
+
+## Platform Notes
+
+**macOS** — Homebrew is required. The build system automatically detects both Apple Silicon (`/opt/homebrew`) and Intel (`/usr/local`) prefixes.
+
+**Linux** — Works on Ubuntu/Debian, Fedora, and Arch. The setup script detects your package manager.
+
+**Windows** — Use WSL2 with Ubuntu 22.04+. Install an X server (VcXsrv, or WSLg on Windows 11), then run the setup and build scripts normally inside WSL2. Native MinGW/MSYS2 builds are also possible; see the documentation.
+
+If you get a build error about a stale CMake cache after updating the project, delete the build directory and rebuild clean:
+
+```bash
+rm -rf build/
+./build.sh
 ```
 
 ---
 
-## 🪟 Windows (WSL2 — Recommended)
-
-1. Install WSL2 with Ubuntu 22.04+
-2. Install an X server: [VcXsrv](https://sourceforge.net/projects/vcxsrv/) or use WSLg (Windows 11)
-3. In WSL2:
-```bash
-export DISPLAY=:0   # if not using WSLg
-./setup.sh
-./build.sh
-./run.sh
-```
-
-### Windows Native (MinGW / MSYS2)
-```bash
-# In MSYS2 UCRT64 shell:
-pacman -S mingw-w64-ucrt-x86_64-SDL2 \
-          mingw-w64-ucrt-x86_64-SDL2_ttf \
-          mingw-w64-ucrt-x86_64-SDL2_mixer \
-          mingw-w64-ucrt-x86_64-sqlite3 \
-          mingw-w64-ucrt-x86_64-cmake \
-          mingw-w64-ucrt-x86_64-gcc \
-          git
-
-# Then run setup manually (skip apt steps) and:
-mkdir build && cd build
-cmake .. -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
-cmake --build . --parallel
-./QueryNoir.exe
-```
-
----
-
-## 📁 Project Structure
+## Project Structure
 
 ```
 query_noir/
-├── CMakeLists.txt          ← Build configuration
-├── setup.sh                ← Dependency installer
-├── build.sh                ← Build runner
-├── run.sh                  ← Game launcher
-├── README.md               ← This file
+├── CMakeLists.txt          Build configuration
+├── setup.sh                Dependency installer
+├── build.sh                CMake build wrapper
+├── run.sh                  Launch the built binary
 │
 ├── src/
-│   ├── main.cpp            ← Entry point, SDL2 init, all UI panels
-│   ├── Database.cpp        ← SQLite3 wrapper + case data seeding
-│   ├── GameState.cpp       ← Core game logic, clue engine, narrative
-│   ├── UITheme.cpp         ← ImGui cyber-noir styling system
-│   └── [stubs]             ← Renderer, Console, etc. (expandable)
+│   ├── main.cpp            SDL2 init, ImGui setup, fonts, main loop
+│   ├── Renderer.cpp        Top bar, left panel, all modals and overlays
+│   ├── QueryConsole.cpp    SQL input widget and results table
+│   ├── NarrativeFeed.cpp   Right-panel detective feed with typewriter
+│   ├── CaseManager.cpp     Case lifecycle — init and future case loading
+│   ├── AudioManager.cpp    Audio init and game-event callback wiring
+│   ├── GameState.cpp       Puzzle engine, clue system, unlock logic
+│   ├── Database.cpp        SQLite3 wrapper and case data seeding
+│   ├── Audio.cpp           Procedural synthesizer and ambient music
+│   ├── Intro.cpp           14-second animated intro sequence
+│   └── UITheme.cpp         Dear ImGui cyber-noir style system
 │
 ├── include/
-│   ├── Types.h             ← All shared types, structs, enums
-│   ├── Database.h
-│   ├── GameState.h
-│   └── UITheme.h
+│   ├── RenderCommon.h      Shared layout, colors, extern state, draw_* decls
+│   ├── Types.h             All shared structs and enums
+│   ├── GameState.h         Game logic interface
+│   ├── Database.h          SQLite3 wrapper interface
+│   ├── Audio.h             Synthesizer interface and SFX enum
+│   ├── AudioManager.h      Audio manager interface
+│   ├── CaseManager.h       Case manager interface
+│   ├── Intro.h             Intro sequence state machine
+│   └── UITheme.h           Styling helpers
 │
 ├── vendor/
-│   └── imgui/              ← Dear ImGui (downloaded by setup.sh)
-│       └── backends/       ← SDL2 + SDLRenderer2 backends
+│   ├── imgui/              Dear ImGui (cloned by setup.sh)
+│   └── sqlite3/            SQLite3 amalgamation fallback
 │
 └── assets/
     └── fonts/
-        ├── JetBrainsMono-Regular.ttf   ← Downloaded by setup.sh
+        ├── JetBrainsMono-Regular.ttf
         └── JetBrainsMono-Bold.ttf
 ```
 
 ---
 
-## 🎮 How to Play
+## How to Play
 
 ### The Interface
+
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  ◈ CASE: ORION MURDER    ● ACTIVE    CLUES: 0/6    22:00:00    │
-├──────────────┬──────────────────────────────┬───────────────────┤
-│              │                              │                   │
-│  DATABASES   │      QUERY CONSOLE           │  DETECTIVE FEED   │
-│              │                              │                   │
-│  💀 VICTIM   │  noir@forensics:~$           │  > Start with     │
-│  👤 SUSPECTS │  SELECT * FROM ...           │    what you know  │
-│  📡 LOGS     │                              │                   │
-│  ✉️ [LOCKED] │  ┌─ RESULTS ──────────────┐ │  ? TRY: SELECT *  │
-│  💰 [LOCKED] │  │ rows glow when suspect  │ │    FROM logs...   │
-│              │  └─────────────────────────┘ │                   │
-│  CLUE BOARD  │                              │                   │
-│  ✓ Found...  │                              │                   │
-│  ○ Unknown   │                              │                   │
-└──────────────┴──────────────────────────────┴───────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│  ◈ QUERY NOIR  |  CASE: ORION MURDER  |  ● ACTIVE  |  EVIDENCE: 0/8    │
+├──────────────────┬─────────────────────────────┬───────────────────────┤
+│                  │                             │                       │
+│  TABLES          │  // QUERY CONSOLE           │  ◈ DETECTIVE FEED     │
+│                  │                             │                       │
+│  ◈ victims       │  noir@forensics:~/orion$    │  > Marcus Orion.      │
+│  ? suspects      │  SELECT * FROM ...          │    42. Found dead.    │
+│  ⊡ access_logs   │                             │                       │
+│  ⊕ [LOCKED]      │  OUTPUT  —  N rows          │  ? Start with the     │
+│  ✉ [LOCKED]      │  ┌─────────────────────┐    │    access logs.       │
+│  $ [LOCKED]      │  │  results table      │    │                       │
+│  ⚑ [LOCKED]      │  └─────────────────────┘    │  # New file unlocked  │
+│  ⚿ [LOCKED]      │                             │                       │
+│                  │                             │                       │
+│  EVIDENCE        │                             │                       │
+│  ✓ Clue found    │                             │                       │
+│  ○ [UNSOLVED]    │                             │                       │
+└──────────────────┴─────────────────────────────┴───────────────────────┘
 ```
 
 ### Controls
-| Key | Action |
-|-----|--------|
-| `Enter` | Execute query |
-| `↑ / ↓` | Browse query history |
-| `Escape` | Quit |
-| Click table name | Auto-fill query |
-| Hover table name | See columns |
 
-### SQL Tips
-```sql
--- See all suspects
-SELECT * FROM suspects;
+| Input | Action |
+|---|---|
+| `Enter` or `EXECUTE` button | Run the current query |
+| `↑` / `↓` arrow keys | Navigate query history |
+| `Escape` | Close active modal, or quit |
+| Click a table name | Auto-fill a `SELECT * LIMIT 5` preview |
+| Hover a table name | Preview column schema |
+| Hover a clue `○` | See the hint for that clue |
+| `SCHEMA` button (top bar) | Toggle the full schema viewer |
+| `ACCUSE` button (top bar) | Appears when you have enough evidence |
+| `SCHEMA` typed as a query | Same as the button |
 
--- Timeline of building access
-SELECT * FROM access_logs ORDER BY timestamp;
+### The Tables
 
--- Filter for nighttime entries
-SELECT * FROM access_logs
-WHERE timestamp LIKE '%2047-03-15 2%'
-ORDER BY timestamp;
+Eight database tables. Three are open from the start. The rest unlock progressively as you find the right data in the previous table — not just by querying it, but by finding something meaningful.
 
--- Cross-reference suspects with logs
-SELECT a.timestamp, a.person_name, a.action, s.alibi
-FROM access_logs a
-LEFT JOIN suspects s ON a.person_name = s.name
-ORDER BY a.timestamp;
+| Table | Starts | Contains |
+|---|---|---|
+| `victims` | Unlocked | Marcus Orion's file |
+| `suspects` | Unlocked | Five suspects with alibis |
+| `access_logs` | Unlocked | 24 building entry/exit records |
+| `badge_registry` | Locked | Who has access to what — and who modified the MASTER badge |
+| `messages` | Locked | Internal and external communications |
+| `transactions` | Locked | NovaCorp financial records |
+| `incident_reports` | Locked | Internal complaints and flags |
+| `decrypted_messages` | Locked | Encrypted messages — requires finding a key |
 
--- Search messages (unlock by querying access_logs first)
-SELECT * FROM messages WHERE encrypted = 0;
+### Evidence
 
--- Follow the money (unlock by querying messages first)
-SELECT * FROM transactions ORDER BY timestamp;
-```
+There are 8 pieces of evidence to find. Each one requires a specific, targeted query — not just `SELECT * FROM table`. Hover over any unsolved clue `○` in the left panel to see its hint.
 
-### Unlocking Tables
-- **messages** — Query `access_logs` first
-- **transactions** — Query `messages` first
+You need at least 5 clues, including the badge tampering clue and Lena's pre-murder message, before the `ACCUSE` button appears.
 
 ### Winning
-Find **4 or more clues** and click **"SUBMIT CASE REPORT"** in the left panel.
+
+When you have gathered enough evidence, the `ACCUSE` button appears in the top bar. Click it, type the full name of the person you believe murdered Marcus Orion, and press `CHARGE`. A wrong accusation gives you specific counter-evidence feedback. You can try again.
 
 ---
 
-## 🎨 Visual Design
+## Sound
 
-- **Background**: Deep blue-black (#0A0F1C)
-- **Primary**: Neon cyan (#00D4FF)
-- **Accent**: Electric purple (#7A5CFF)
-- **Danger**: Red glow (#FF4D4D)
-- **Success**: Teal green (#32E696)
-- **Font**: JetBrains Mono
-- **Effects**: Scanlines, grid overlay, row glow, typewriter text, screen glitch on query
+All audio is synthesized procedurally at runtime using SDL2's audio API. No external sound files are required. The game produces:
 
----
-
-## 🧩 Expanding the Game
-
-### Add a New Case
-1. Create a new seed method in `Database.cpp`
-2. Define tables, clues, and a `Case` struct in `GameState::init_case_*()`
-3. Modify `check_clues()` with the new trigger conditions
-
-### Add Sound Effects
-The `AudioManager.cpp` stub is ready — hook in SDL2_mixer calls there and call from `GameState::run_query()`.
-
-### Add More Tables
-```cpp
-// In Database.cpp seed method:
-const char* sql = "CREATE TABLE new_table (...); INSERT INTO ...;";
-execute(sql);
-
-// In GameState::init_case_orion():
-m_tables.push_back({ "new_table", "NEW TABLE", false, "unlock_condition", {}, "🔍" });
-```
+- Mechanical key click on every keystroke
+- Rising digital sweep when a query executes
+- Ascending chime when a new table unlocks
+- Crystalline ping when evidence is found
+- Descending buzzer on SQL errors
+- Dark ambient drone that increases in tension as evidence accumulates
+- A dramatic three-note sting when you make your accusation
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
-**"SDL2 not found"** → Run `./setup.sh` or install `libsdl2-dev`
+**SDL2 not found** — Run `./setup.sh`, or on macOS run `brew install sdl2`.
 
-**"ImGui not found"** → Run `./setup.sh` (clones from GitHub)
+**ImGui not found** — Run `./setup.sh`. It clones Dear ImGui from GitHub into `vendor/imgui/`.
 
-**Font not loading** → Game falls back to ImGui default font automatically
+**Font not loading** — The game falls back to ImGui's built-in bitmap font automatically. To get JetBrains Mono, run `./setup.sh`.
 
-**Black screen** → Check if SDL2 renderer is hardware-accelerated (`SDL_RENDERER_ACCELERATED`)
+**Wayland issues on Linux** — Run `export SDL_VIDEODRIVER=x11` before launching.
 
-**Wayland issues (Linux)** → `export SDL_VIDEODRIVER=x11` before running
+**Black screen / renderer error** — Make sure your system supports hardware-accelerated rendering (`SDL_RENDERER_ACCELERATED`). On virtual machines, try `export SDL_RENDERER=software`.
 
+**Stale build errors after updating** — Delete `build/` and rebuild: `rm -rf build/ && ./build.sh`.
+
+**incident_reports shows 0 rows** — This was a known bug caused by Unicode em-dashes in SQL string literals aborting the seed. It is fixed in the current version. If you are seeing it, make sure you have the latest source.
+
+---
+
+## Extending the Game
+
+To add a new case, add a new seed method to `Database.cpp`, define tables and clues in a new `GameState::init_case_*()` method, add the unlock logic to `check_unlocks()` and `check_puzzles()`, and call it from `CaseManager::init()`. The architecture is designed to support multiple cases through `CaseManager`.
+
+---
 
 *"The data doesn't lie. People do."*

@@ -95,13 +95,15 @@ ImGui::TextColored(C_TEXT(0.88f), "QUERY NOIR"); ImGui::SameLine();
 ImGui::TextColored(C_DIM(0.22f), "|"); ImGui::SameLine();
 ImGui::TextColored(C_DIM(0.55f), "CASE:"); ImGui::SameLine(0, 4);
 static int current_case_idx = 0;
-const char* cases[] = { "ORION MURDER", "PROJECT BLUEBIRD" };
+const char* cases[] = { "ORION MURDER", "PROJECT BLUEBIRD", "SANTIAGO HEIST" };
 ImGui::PushStyleColor(ImGuiCol_Text, C_NEON(0.82f)); 
 ImGui::SetNextItemWidth(180.f);
 
 if (ImGui::Combo("##case_combo", &current_case_idx, cases, IM_ARRAYSIZE(cases))) {
     if (current_case_idx == 0) CaseManager::load_case(g_state, "orion");
     if (current_case_idx == 1) CaseManager::load_case(g_state, "espionage");
+    if (current_case_idx == 2) CaseManager::load_case(g_state, "heist");
+
 }
 ImGui::PopStyleColor(); // Return to normal text color for the rest of the UI
 

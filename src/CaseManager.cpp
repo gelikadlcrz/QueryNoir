@@ -4,6 +4,7 @@
 // The Manager MUST include the cartridges to plug them in!
 #include "OrionCase.h"     
 #include "EspionageCase.h" 
+#include "SantiagoHeistCase.h"
 
 namespace CaseManager {
 
@@ -22,6 +23,9 @@ namespace CaseManager {
         } 
         else if (case_id == "espionage") {
             active_case = new EspionageCase();
+        } 
+        else if (case_id == "heist") {
+            active_case = new SantiagoHeistCase();
         } 
         else {
             return; // Safety fallback if the case ID doesn't exist
